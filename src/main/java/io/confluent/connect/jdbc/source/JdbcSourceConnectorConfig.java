@@ -175,8 +175,8 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
   public static final String MODE_TIMESTAMP = "timestamp";
   public static final String MODE_INCREMENTING = "incrementing";
   public static final String MODE_TIMESTAMP_INCREMENTING = "timestamp+incrementing";
-
   public static final String INCREMENTING_COLUMN_NAME_CONFIG = "incrementing.column.name";
+
   private static final String INCREMENTING_COLUMN_NAME_DOC =
       "The name of the strictly incrementing column to use to detect new rows. Any empty value "
       + "indicates the column should be autodetected by looking for an auto-incrementing column. "
@@ -192,6 +192,16 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + "column should not be nullable.";
   public static final String TIMESTAMP_COLUMN_NAME_DEFAULT = "";
   private static final String TIMESTAMP_COLUMN_NAME_DISPLAY = "Timestamp Column Name";
+  public static final String TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG =
+          "table.datetimestamp.column.name";
+  private static final String TABLE_DATETIMESTAMP_COLUMN_NAME_DOC =
+          "Comma separated list of one or more datetimestamp columns to detect new "
+      + "or modified rows using "
+      + "the COALESCE SQL function. Rows whose first non-null timestamp value is greater than the "
+      + "largest previous timestamp value seen will be discovered with each poll. At least one "
+      + "column should not be nullable.";
+  public static final String TABLE_DATETIMESTAMP_COLUMN_NAME_DEFAULT = "";
+  private static final String TABLE_DATETIMESTAMP_COLUMN_NAME_DISPLAY = "Timestamp Column Name";
 
   public static final String TIMESTAMP_INITIAL_CONFIG = "timestamp.initial";
   public static final Long TIMESTAMP_INITIAL_DEFAULT = null;
@@ -280,6 +290,12 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
       + "to, or in the case of a custom query, the full name of the topic to publish to.";
   private static final String TOPIC_PREFIX_DISPLAY = "Topic Prefix";
 
+  public static final String SPLIT_DATETIME_COLUMNS_CONFIG = "split.datetime.columns";
+  private static final String SPLIT_DATETIME_COLUMNS_DOC =
+          "To check if datetime values are separated in 2 columns in a table. "
+          + "This will cause different query commands";
+  public static final boolean SPLIT_DATETIME_COLUMNS_DEFAULT = false;
+  private static final String SPLIT_DATETIME_COLUMNS_DISPLAY = "Validate Non Null";
   public static final String VALIDATE_NON_NULL_CONFIG = "validate.non.null";
   private static final String VALIDATE_NON_NULL_DOC =
       "By default, the JDBC connector will validate that all incrementing and timestamp tables "
@@ -571,6 +587,8 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         Arrays.asList(
             INCREMENTING_COLUMN_NAME_CONFIG,
             TIMESTAMP_COLUMN_NAME_CONFIG,
+            TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG,
+            SPLIT_DATETIME_COLUMNS_CONFIG,
             VALIDATE_NON_NULL_CONFIG
         )
     ).define(
@@ -596,6 +614,17 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         TIMESTAMP_COLUMN_NAME_DISPLAY,
         MODE_DEPENDENTS_RECOMMENDER
     ).define(
+        TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG,
+        Type.LIST,
+        TABLE_DATETIMESTAMP_COLUMN_NAME_DEFAULT,
+        Importance.MEDIUM,
+        TABLE_DATETIMESTAMP_COLUMN_NAME_DOC,
+        MODE_GROUP,
+        ++orderInGroup,
+        Width.MEDIUM,
+        TABLE_DATETIMESTAMP_COLUMN_NAME_DISPLAY,
+        MODE_DEPENDENTS_RECOMMENDER
+    ).define(
         TIMESTAMP_INITIAL_CONFIG,
         Type.LONG,
         TIMESTAMP_INITIAL_DEFAULT,
@@ -616,6 +645,17 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         ++orderInGroup,
         Width.SHORT,
         VALIDATE_NON_NULL_DISPLAY,
+        MODE_DEPENDENTS_RECOMMENDER
+    ).define(
+        SPLIT_DATETIME_COLUMNS_CONFIG,
+        Type.BOOLEAN,
+        SPLIT_DATETIME_COLUMNS_DEFAULT,
+        Importance.LOW,
+        SPLIT_DATETIME_COLUMNS_DOC,
+        MODE_GROUP,
+        ++orderInGroup,
+        Width.SHORT,
+        SPLIT_DATETIME_COLUMNS_DISPLAY,
         MODE_DEPENDENTS_RECOMMENDER
     ).define(
         QUERY_CONFIG,
@@ -874,19 +914,28 @@ public class JdbcSourceConnectorConfig extends AbstractConfig {
         case MODE_BULK:
           return false;
         case MODE_TIMESTAMP:
-          return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG) || name.equals(VALIDATE_NON_NULL_CONFIG);
+          return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG)
+                  || name.equals(TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG)
+                  || name.equals(VALIDATE_NON_NULL_CONFIG);
         case MODE_INCREMENTING:
           return name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
                  || name.equals(VALIDATE_NON_NULL_CONFIG);
         case MODE_TIMESTAMP_INCREMENTING:
-          return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG)
-                 || name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
-                 || name.equals(VALIDATE_NON_NULL_CONFIG);
+          return validateModeTimestampIncrementing(name);
+
         case MODE_UNSPECIFIED:
           throw new ConfigException("Query mode must be specified");
         default:
           throw new ConfigException("Invalid mode: " + mode);
       }
+    }
+
+    private boolean validateModeTimestampIncrementing(String name) {
+      return name.equals(TIMESTAMP_COLUMN_NAME_CONFIG)
+              || name.equals(INCREMENTING_COLUMN_NAME_CONFIG)
+              || name.equals(TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG)
+              || name.equals(VALIDATE_NON_NULL_CONFIG);
+
     }
   }
 

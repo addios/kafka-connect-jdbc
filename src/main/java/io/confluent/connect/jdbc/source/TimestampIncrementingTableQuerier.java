@@ -66,6 +66,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
   );
 
   protected final List<String> timestampColumnNames;
+
   protected TimestampIncrementingOffset committedOffset;
   protected TimestampIncrementingOffset offset;
   protected TimestampIncrementingCriteria criteria;
@@ -73,7 +74,9 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
   protected final String topic;
   protected final TimestampGranularity timestampGranularity;
   private final List<ColumnId> timestampColumns;
-  private String incrementingColumnName;
+
+
+  protected String incrementingColumnName;
   private final long timestampDelay;
   private final TimeZone timeZone;
 
@@ -117,6 +120,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
     this.timestampGranularity = timestampGranularity;
   }
 
+
   /**
    * JDBC TypeName constant for SQL Server's DATETIME columns.
    */
@@ -144,8 +148,10 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
         throw new ConnectException("Unknown mode encountered when preparing query: " + mode);
     }
 
-    // Append the criteria using the columns ...
+
     criteria = dialect.criteriaFor(incrementingColumn, timestampColumns);
+    // Append the criteria using the columns ...
+
     criteria.whereClause(builder);
 
     addSuffixIfPresent(builder);
@@ -177,7 +183,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
     log.trace("Set the committed offset: {}", committedOffset.getTimestampOffset());
   }
 
-  private void findDefaultAutoIncrementingColumn(Connection db) throws SQLException {
+  protected void findDefaultAutoIncrementingColumn(Connection db) throws SQLException {
     // Default when unspecified uses an autoincrementing column
     if (incrementingColumnName != null && incrementingColumnName.isEmpty()) {
       // Find the first auto-incremented column ...

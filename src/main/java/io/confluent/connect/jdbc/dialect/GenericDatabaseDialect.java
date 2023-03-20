@@ -18,6 +18,7 @@ package io.confluent.connect.jdbc.dialect;
 import java.time.ZoneOffset;
 import java.util.TimeZone;
 
+import io.confluent.connect.jdbc.util.ColumnDateTime;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.types.Password;
@@ -155,7 +156,7 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   private final Queue<Connection> connections = new ConcurrentLinkedQueue<>();
   private volatile JdbcDriverInfo jdbcDriverInfo;
   private final int batchMaxRows;
-  private final TimeZone timeZone;
+  protected final TimeZone timeZone;
   private final JdbcSourceConnectorConfig.TimestampGranularity tsGranularity;
 
   /**
@@ -247,10 +248,13 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     // handshake, while still giving enough time to validate once in the follower worker,
     // and again in the leader worker and still be under 90s REST serving timeout
     DriverManager.setLoginTimeout(40);
+    glog.info("--------------- START GETTING CONNECTION");
     Connection connection = DriverManager.getConnection(jdbcUrl, properties);
+    glog.info("--------------- STOP GETTING CONNECTION");
     if (jdbcDriverInfo == null) {
       jdbcDriverInfo = createJdbcDriverInfo(connection);
     }
+
     connections.add(connection);
     return connection;
   }
@@ -488,11 +492,8 @@ public class GenericDatabaseDialect implements DatabaseDialect {
     try (ResultSet rs = metadata.getTableTypes()) {
       while (rs.next()) {
         String tableType = rs.getString(1);
-        if (tableType != null) {
-          tableType = tableType.trim();
-          if (uppercaseTypes.contains(tableType.toUpperCase(Locale.ROOT))) {
-            matchingTableTypes.add(tableType);
-          }
+        if (tableType != null && uppercaseTypes.contains(tableType.toUpperCase(Locale.ROOT))) {
+          matchingTableTypes.add(tableType);
         }
       }
     }
@@ -988,6 +989,16 @@ public class GenericDatabaseDialect implements DatabaseDialect {
       List<ColumnId> timestampColumns
   ) {
     return new TimestampIncrementingCriteria(incrementingColumn, timestampColumns, timeZone);
+  }
+
+  @Override
+  public TimestampIncrementingCriteria criteriaFor(
+          ColumnId incrementingColumn,
+          ColumnDateTime dateTimeColumn
+  ) {
+    log.debug("CacheDatabaseDialect Table {} , detaTimestampColumns {}",
+            incrementingColumn,  dateTimeColumn);
+    return new TimestampIncrementingCriteria(incrementingColumn, dateTimeColumn, timeZone);
   }
 
   /**

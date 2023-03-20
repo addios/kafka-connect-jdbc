@@ -34,6 +34,9 @@ import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
 import io.confluent.connect.jdbc.source.ColumnMapping;
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig.TransactionIsolationMode;
 import io.confluent.connect.jdbc.source.TimestampIncrementingCriteria;
+
+
+import io.confluent.connect.jdbc.util.ColumnDateTime;
 import io.confluent.connect.jdbc.util.ColumnDefinition;
 import io.confluent.connect.jdbc.util.ColumnId;
 import io.confluent.connect.jdbc.util.ConnectionProvider;
@@ -41,7 +44,6 @@ import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.IdentifierRules;
 import io.confluent.connect.jdbc.util.TableDefinition;
 import io.confluent.connect.jdbc.util.TableId;
-
 import org.apache.kafka.connect.data.Field;
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
@@ -302,6 +304,13 @@ public interface DatabaseDialect extends ConnectionProvider {
       ColumnId incrementingColumn,
       List<ColumnId> timestampColumns
   );
+
+  default TimestampIncrementingCriteria criteriaFor(
+      ColumnId incrementingColumn,
+      ColumnDateTime dateTimeColumn
+  ) {
+    return null;
+  }
 
   /**
    * Use the supplied {@link SchemaBuilder} to add a field that corresponds to the column with the

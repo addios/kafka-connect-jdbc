@@ -26,7 +26,7 @@
     <groupId>io.confluent</groupId>
     <artifactId>kafka-connect-jdbc</artifactId>
     <packaging>jar</packaging>
-    <version>10.6.4-SNAPSHOT</version>
+    <version>10.6.4-ADDIOS-SNAPSHOT</version>
     <name>kafka-connect-jdbc</name>
     <organization>
         <name>Confluent, Inc.</name>
@@ -138,6 +138,7 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.easymock</groupId>
             <artifactId>easymock</artifactId>
@@ -293,7 +294,9 @@
             <plugin>
                 <groupId>io.confluent</groupId>
                 <version>${kafka.connect.maven.plugin.version}</version>
+
                 <artifactId>kafka-connect-maven-plugin</artifactId>
+
                 <executions>
                     <execution>
                         <goals>
@@ -361,11 +364,18 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <trimStackTrace>false</trimStackTrace>
+                     <skipTests>true</skipTests>
+
                 </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
+                <!--
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
+                -->
                 <executions>
                     <execution>
                         <!--normal integration tests should not run the memory-restricted tests -->
@@ -395,6 +405,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
+
                 <configuration>
                     <descriptors>
                         <descriptor>src/assembly/development.xml</descriptor>

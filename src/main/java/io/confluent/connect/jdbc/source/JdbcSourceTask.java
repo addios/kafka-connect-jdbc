@@ -17,6 +17,12 @@ package io.confluent.connect.jdbc.source;
 
 import java.sql.SQLNonTransientException;
 import java.util.TimeZone;
+
+import io.confluent.connect.jdbc.util.CachedConnectionProvider;
+import io.confluent.connect.jdbc.util.ColumnDefinition;
+import io.confluent.connect.jdbc.util.ColumnId;
+import io.confluent.connect.jdbc.util.TableId;
+import io.confluent.connect.jdbc.util.Version;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.utils.SystemTime;
 import org.apache.kafka.common.utils.Time;
@@ -46,11 +52,6 @@ import java.util.stream.Collectors;
 
 import io.confluent.connect.jdbc.dialect.DatabaseDialect;
 import io.confluent.connect.jdbc.dialect.DatabaseDialects;
-import io.confluent.connect.jdbc.util.CachedConnectionProvider;
-import io.confluent.connect.jdbc.util.ColumnDefinition;
-import io.confluent.connect.jdbc.util.ColumnId;
-import io.confluent.connect.jdbc.util.TableId;
-import io.confluent.connect.jdbc.util.Version;
 import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig.TransactionIsolationMode;
 
 /**
@@ -179,12 +180,29 @@ public class JdbcSourceTask extends SourceTask {
         = config.getString(JdbcSourceTaskConfig.INCREMENTING_COLUMN_NAME_CONFIG);
     List<String> timestampColumns
         = config.getList(JdbcSourceTaskConfig.TIMESTAMP_COLUMN_NAME_CONFIG);
+    List<String> tableDatetimestampColumns
+            = config.getList(JdbcSourceTaskConfig.TABLE_DATETIMESTAMP_COLUMN_NAME_CONFIG);
     Long timestampDelayInterval
         = config.getLong(JdbcSourceTaskConfig.TIMESTAMP_DELAY_INTERVAL_MS_CONFIG);
     boolean validateNonNulls
         = config.getBoolean(JdbcSourceTaskConfig.VALIDATE_NON_NULL_CONFIG);
+    boolean splitDatetimeColumns
+            = config.getBoolean(JdbcSourceTaskConfig.SPLIT_DATETIME_COLUMNS_CONFIG);
     TimeZone timeZone = config.timeZone();
     String suffix = config.getString(JdbcSourceTaskConfig.QUERY_SUFFIX_CONFIG).trim();
+
+
+    Map<String, String> mapTableDatetimestampColumns = new HashMap<String, String>() ;
+    for (String tableOrQuery : tablesOrQuery) {
+      for (String tableDatetimestampColumn : tableDatetimestampColumns) {
+        if (tableDatetimestampColumn != null && !tableDatetimestampColumn.isEmpty()) {
+          log.warn("++++++++++++ JDBCSourceTask - tableOrQuery {}  tableDatetimestampColumn {} ",
+                  tableOrQuery, tableDatetimestampColumn);
+
+          mapTableDatetimestampColumns.put(tableOrQuery, tableDatetimestampColumn);
+        }
+      }
+    }
 
     for (String tableOrQuery : tablesOrQuery) {
       final List<Map<String, String>> tablePartitionsToCheck;
@@ -258,36 +276,73 @@ public class JdbcSourceTask extends SourceTask {
             )
         );
       } else if (mode.equals(JdbcSourceTaskConfig.MODE_TIMESTAMP)) {
-        tableQueue.add(
-            new TimestampTableQuerier(
-                dialect,
-                queryMode,
-                tableOrQuery,
-                topicPrefix,
-                timestampColumns,
-                offset,
-                timestampDelayInterval,
-                timeZone,
-                suffix,
-                timestampGranularity
-            )
-        );
+        if (splitDatetimeColumns) {
+          tableQueue.add(
+              new TimestampTableSplitColumnsQuerier(
+                  dialect,
+                  queryMode,
+                  tableOrQuery,
+                  topicPrefix,
+                  timestampColumns,
+                  offset,
+                  timestampDelayInterval,
+                  timeZone,
+                  suffix,
+                  timestampGranularity,
+                  mapTableDatetimestampColumns.get(tableOrQuery)
+              )
+          );
+        } else {
+          tableQueue.add(
+              new TimestampTableQuerier(
+                  dialect,
+                  queryMode,
+                  tableOrQuery,
+                  topicPrefix,
+                  timestampColumns,
+                  offset,
+                  timestampDelayInterval,
+                  timeZone,
+                  suffix,
+                  timestampGranularity
+              )
+          );
+        }
       } else if (mode.endsWith(JdbcSourceTaskConfig.MODE_TIMESTAMP_INCREMENTING)) {
-        tableQueue.add(
-            new TimestampIncrementingTableQuerier(
-                dialect,
-                queryMode,
-                tableOrQuery,
-                topicPrefix,
-                timestampColumns,
-                incrementingColumn,
-                offset,
-                timestampDelayInterval,
-                timeZone,
-                suffix,
-                timestampGranularity
-            )
-        );
+        if (splitDatetimeColumns) {
+          tableQueue.add(
+              new TimestampIncrementingTableSplitColumnsQuerier(
+                  dialect,
+                  queryMode,
+                  tableOrQuery,
+                  topicPrefix,
+                  timestampColumns,
+                  incrementingColumn,
+                  offset,
+                  timestampDelayInterval,
+                  timeZone,
+                  suffix,
+                  timestampGranularity,
+                  mapTableDatetimestampColumns.get(tableOrQuery)
+              )
+          );
+        } else {
+          tableQueue.add(
+              new TimestampIncrementingTableQuerier(
+                  dialect,
+                  queryMode,
+                  tableOrQuery,
+                  topicPrefix,
+                  timestampColumns,
+                  incrementingColumn,
+                  offset,
+                  timestampDelayInterval,
+                  timeZone,
+                  suffix,
+                  timestampGranularity
+              )
+          );
+        }
       }
     }
 

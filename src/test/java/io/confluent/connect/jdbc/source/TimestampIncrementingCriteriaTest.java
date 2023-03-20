@@ -68,8 +68,8 @@ public class TimestampIncrementingCriteriaTest {
 
   @Before
   public void beforeEach() {
-    criteria = new TimestampIncrementingCriteria(null, null, utcTimeZone);
-    criteriaInc = new TimestampIncrementingCriteria(INCREMENTING_COLUMN, null, utcTimeZone);
+    criteria = new TimestampIncrementingCriteria((ColumnId) null, (List<ColumnId>) null, utcTimeZone);
+    criteriaInc = new TimestampIncrementingCriteria(INCREMENTING_COLUMN, (List<ColumnId>) null, utcTimeZone);
     criteriaTs = new TimestampIncrementingCriteria(null, TS_COLUMNS, utcTimeZone);
     criteriaIncTs = new TimestampIncrementingCriteria(INCREMENTING_COLUMN, TS_COLUMNS, utcTimeZone);
     identifierQuoting = null;

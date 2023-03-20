@@ -15,10 +15,13 @@
 
 package io.confluent.connect.jdbc.source;
 
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.TimeZone;
+import java.sql.Time;
+import java.sql.Date;
 
+import io.confluent.connect.jdbc.util.ColumnDateTime;
+import io.confluent.connect.jdbc.util.ColumnId;
+import io.confluent.connect.jdbc.util.DateTimeUtils;
+import io.confluent.connect.jdbc.util.ExpressionBuilder;
 import io.confluent.connect.jdbc.util.LruCache;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Field;
@@ -33,13 +36,12 @@ import java.math.BigDecimal;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
-
-import io.confluent.connect.jdbc.util.ColumnId;
-import io.confluent.connect.jdbc.util.DateTimeUtils;
-import io.confluent.connect.jdbc.util.ExpressionBuilder;
 
 public class TimestampIncrementingCriteria {
 
@@ -78,6 +80,7 @@ public class TimestampIncrementingCriteria {
   protected final Logger log = LoggerFactory.getLogger(getClass());
   protected final List<ColumnId> timestampColumns;
   protected final ColumnId incrementingColumn;
+  protected ColumnDateTime datetimestampColumns;
   protected final TimeZone timeZone;
   private final LruCache<Schema, List<String>> caseAdjustedTimestampColumns;
 
@@ -95,8 +98,21 @@ public class TimestampIncrementingCriteria {
         timestampColumns != null ? new LruCache<>(16) : null;
   }
 
+  public TimestampIncrementingCriteria(
+          ColumnId incrementingColumn,
+          ColumnDateTime datetimestampColumns,
+          TimeZone timeZone
+  ) {
+    this(incrementingColumn, (List<ColumnId>) null, timeZone);
+    this.datetimestampColumns = datetimestampColumns;
+  }
+
   protected boolean hasTimestampColumns() {
     return !timestampColumns.isEmpty();
+  }
+
+  protected boolean hasDatetimestampColumns() {
+    return incrementingColumn != null;
   }
 
   protected boolean hasIncrementedColumn() {
@@ -109,7 +125,10 @@ public class TimestampIncrementingCriteria {
    * @param builder the string builder to which the WHERE clause should be appended; never null
    */
   public void whereClause(ExpressionBuilder builder) {
-    if (hasTimestampColumns() && hasIncrementedColumn()) {
+
+    if (hasDatetimestampColumns() && hasIncrementedColumn()) {
+      datetimestampIncrementingWhereClause(builder);
+    } else if (hasTimestampColumns() && hasIncrementedColumn()) {
       timestampIncrementingWhereClause(builder);
     } else if (hasTimestampColumns()) {
       timestampWhereClause(builder);
@@ -130,7 +149,9 @@ public class TimestampIncrementingCriteria {
       PreparedStatement stmt,
       CriteriaValues values
   ) throws SQLException {
-    if (hasTimestampColumns() && hasIncrementedColumn()) {
+    if (hasDatetimestampColumns() && hasIncrementedColumn()) {
+      setQueryParametersDateTimestampIncrementing(stmt, values);
+    } else if (hasTimestampColumns() && hasIncrementedColumn()) {
       setQueryParametersTimestampIncrementing(stmt, values);
     } else if (hasTimestampColumns()) {
       setQueryParametersTimestamp(stmt, values);
@@ -139,6 +160,8 @@ public class TimestampIncrementingCriteria {
     }
   }
 
+
+  //TODO Change parameters
   protected void setQueryParametersTimestampIncrementing(
       PreparedStatement stmt,
       CriteriaValues values
@@ -154,6 +177,32 @@ public class TimestampIncrementingCriteria {
         "Executing prepared statement with start time value = {} end time = {} and incrementing"
         + " value = {}", DateTimeUtils.formatTimestamp(beginTime, timeZone),
         DateTimeUtils.formatTimestamp(endTime, timeZone), incOffset
+    );
+  }
+
+  protected void setQueryParametersDateTimestampIncrementing(
+          PreparedStatement stmt,
+          CriteriaValues values
+  ) throws SQLException {
+    Timestamp beginTime = values.beginTimestampValue();
+    Timestamp endTime = values.endTimestampValue();
+    Long incOffset = values.lastIncrementedValue();
+    stmt.setDate(1, new Date(endTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setDate(2, new Date(endTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setTime(3, new Time(endTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setDate(4, new Date(beginTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setTime(5, new Time(beginTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setLong(6, incOffset);
+    stmt.setDate(1, new Date(beginTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setDate(2, new Date(beginTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    stmt.setTime(3, new Time(beginTime.getTime()), DateTimeUtils.getTimeZoneCalendar(timeZone));
+    log.debug(
+            "Executing prepared statement with start date value = {} start time value = {} "
+                    + "- end date = {} end time = {} and incrementing value = {}",
+            DateTimeUtils.formatTimestamp(new Date(beginTime.getTime()), timeZone),
+            DateTimeUtils.formatTimestamp(new Time(beginTime.getTime()), timeZone),
+            DateTimeUtils.formatTimestamp(new Date(endTime.getTime()), timeZone),
+            DateTimeUtils.formatTimestamp(new Time(endTime.getTime()), timeZone), incOffset
     );
   }
 
@@ -327,6 +376,55 @@ public class TimestampIncrementingCriteria {
     builder.append(" > ?)");
     builder.append(" ORDER BY ");
     coalesceTimestampColumns(builder);
+    builder.append(",");
+    builder.append(incrementingColumn);
+    builder.append(" ASC");
+  }
+
+
+  protected void datetimestampIncrementingWhereClause(ExpressionBuilder builder) {
+    // This version combines two possible conditions. The first checks timestamp == last
+    // timestamp and incrementing > last incrementing. The timestamp alone would include
+    // duplicates, but adding the incrementing condition ensures no duplicates, e.g. you would
+    // get only the row with id = 23:
+    //  timestamp 1234, id 22 <- last
+    //  timestamp 1234, id 23
+    // The second check only uses the timestamp > last timestamp. This covers everything new,
+    // even if it is an update of the existing row. If we previously had:
+    //  timestamp 1234, id 22 <- last
+    // and then these rows were written:
+    //  timestamp 1235, id 22
+    //  timestamp 1236, id 23
+    // We should capture both id = 22 (an update) and id = 23 (a new row)
+    builder.append(" WHERE ");
+    builder.append(" (( ");
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append("  < ? ");
+    builder.append("  ) OR ( ");
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append("  = ? AND ");
+    builder.append(datetimestampColumns.getColumnTime());
+    builder.append("  < ? )) AND ((");
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append("  = ? AND ");
+    builder.append(datetimestampColumns.getColumnTime());
+    builder.append("  = ? ) AND ");
+    builder.append(incrementingColumn);
+    builder.append(" > ?");
+    builder.append(") OR ");
+    builder.append(" (( ");
+
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append("  > ? ");
+    builder.append("  ) OR ( ");
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append("  = ? AND ");
+    builder.append(datetimestampColumns.getColumnTime());
+    builder.append("  > ? )))");
+    builder.append(" ORDER BY ");
+    builder.append(datetimestampColumns.getColumnDate());
+    builder.append(",");
+    builder.append(datetimestampColumns.getColumnTime());
     builder.append(",");
     builder.append(incrementingColumn);
     builder.append(" ASC");
