@@ -149,9 +149,12 @@ public class TimestampIncrementingCriteria {
       PreparedStatement stmt,
       CriteriaValues values
   ) throws SQLException {
+    log.warn("++++  setQueryParameters+++++++++++++++++++++++");
     if (hasDatetimestampColumns() && hasIncrementedColumn()) {
+      log.warn("++++  setQueryParameters  hasDatetimestampColumns +++++++++++++++++++++++");
       setQueryParametersDateTimestampIncrementing(stmt, values);
     } else if (hasTimestampColumns() && hasIncrementedColumn()) {
+      log.warn("++++  setQueryParameters  hasTimestampColumns +++++++++++++++++++++++");
       setQueryParametersTimestampIncrementing(stmt, values);
     } else if (hasTimestampColumns()) {
       setQueryParametersTimestamp(stmt, values);

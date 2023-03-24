@@ -214,6 +214,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
 
   @Override
   protected ResultSet executeQuery() throws SQLException {
+    log.warn("+++++++++++++++++++++++++++++++++++++++++");
     criteria.setQueryParameters(stmt, this);
     log.trace("Statement to execute: {}", stmt.toString());
     return stmt.executeQuery();

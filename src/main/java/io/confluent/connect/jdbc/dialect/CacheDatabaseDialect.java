@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A {@link DatabaseDialect} for MySQL.
+ * A {@link DatabaseDialect} for Cache.
  */
 public class CacheDatabaseDialect extends GenericDatabaseDialect {
 
@@ -52,10 +52,12 @@ public class CacheDatabaseDialect extends GenericDatabaseDialect {
     }
   }
 
-  public CacheDatabaseDialect(AbstractConfig config) {
-    super(config);
 
+  public CacheDatabaseDialect(AbstractConfig config) {
+    super(config, new IdentifierRules(".", "`", "`"));
   }
+
+
 
   protected CacheDatabaseDialect(AbstractConfig config, IdentifierRules defaultIdentifierRules) {
     super(config, defaultIdentifierRules);

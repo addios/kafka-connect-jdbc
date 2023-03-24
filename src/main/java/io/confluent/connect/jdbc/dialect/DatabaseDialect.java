@@ -307,7 +307,8 @@ public interface DatabaseDialect extends ConnectionProvider {
 
   default TimestampIncrementingCriteria criteriaFor(
       ColumnId incrementingColumn,
-      ColumnDateTime dateTimeColumn
+      ColumnDateTime dateTimeColumn,
+      String distiguishFunction
   ) {
     return null;
   }

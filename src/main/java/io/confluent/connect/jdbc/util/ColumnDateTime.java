@@ -33,11 +33,8 @@ public class ColumnDateTime {
 
 
   public ColumnDateTime(TableId tableId, String mapTableColumns) {
-    String[] arrOfTableColumns = mapTableColumns.split("|");
+    String[] arrOfTableColumns = mapTableColumns.split("\\|");
 
-
-    log.warn("++++++++ tableId {}, date {}", tableId, arrOfTableColumns[1]);
-    log.warn("++++++++ tableId {}, time {}", tableId, arrOfTableColumns[2]);
     this.columnDate = new ColumnId(tableId, arrOfTableColumns[1]);
     this.columnTime = new ColumnId(tableId, arrOfTableColumns[2]);
   }

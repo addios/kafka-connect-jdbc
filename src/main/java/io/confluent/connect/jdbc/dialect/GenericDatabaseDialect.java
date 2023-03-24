@@ -994,7 +994,8 @@ public class GenericDatabaseDialect implements DatabaseDialect {
   @Override
   public TimestampIncrementingCriteria criteriaFor(
           ColumnId incrementingColumn,
-          ColumnDateTime dateTimeColumn
+          ColumnDateTime dateTimeColumn,
+          String distiguishFunction
   ) {
     log.debug("CacheDatabaseDialect Table {} , detaTimestampColumns {}",
             incrementingColumn,  dateTimeColumn);

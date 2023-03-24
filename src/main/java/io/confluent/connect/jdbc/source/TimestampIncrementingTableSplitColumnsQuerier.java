@@ -67,9 +67,6 @@ public class TimestampIncrementingTableSplitColumnsQuerier
     super(dialect, mode, name, topicPrefix, timestampColumnNames, incrementingColumnName, offsetMap,
             timestampDelay, timeZone, suffix, timestampGranularity);
     this.datetimestampColumns = new ColumnDateTime(tableId, tableDatetimestampColumnName);
-    log.warn("++++++++ date {}, time {}",
-            this.datetimestampColumns.getColumnDate().name(),
-            this.datetimestampColumns.getColumnTime().name());
   }
 
 
@@ -99,7 +96,7 @@ public class TimestampIncrementingTableSplitColumnsQuerier
             incrementingColumn,
             datetimestampColumns.getColumnDate().name(),
             datetimestampColumns.getColumnTime().name());
-    criteria = dialect.criteriaFor(incrementingColumn, datetimestampColumns);
+    criteria = dialect.criteriaFor(incrementingColumn, datetimestampColumns, "");
     // Append the criteria using the columns ...
 
     criteria.whereClause(builder);
